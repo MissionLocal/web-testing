@@ -399,3 +399,10 @@ a:hover { text-decoration: underline; }
 .network-chart .links line.is-search-hi {
   stroke-opacity: 0.55 !important;
 }
+
+/* scrolly coaching highlight */
+.coach-highlight {
+  outline: 3px solid rgba(246, 124, 246, 0.95); /* your pink */
+  outline-offset: 6px;
+  border-radius: 14px;
+}

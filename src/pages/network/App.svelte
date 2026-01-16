@@ -4,6 +4,9 @@
 
   import graph from "../data/graph.json";
 
+  // ✅ Scrolly command listener (new)
+  import { scrollyCommand } from "../../lib/scrollyController";
+
   // ---- MASTER DATA (unchanged references) ----
   const allNodes = graph.nodes;
   const allLinks = graph.links;
@@ -118,22 +121,20 @@
   ).sort();
 
   // Avatars
-// Avatars
-const imageFiles = import.meta.glob("../../assets/avatars/*.{png,jpg,jpeg,svg}", {
-  eager: true,
-  as: "url",
-});
+  const imageFiles = import.meta.glob("../../assets/avatars/*.{png,jpg,jpeg,svg}", {
+    eager: true,
+    as: "url",
+  });
 
-function findImageUrl(id) {
-  for (const ext of ["png", "jpg", "jpeg", "svg"]) {
-    const key = `../../assets/avatars/${id}.${ext}`;
-    if (imageFiles[key]) return imageFiles[key];
+  function findImageUrl(id) {
+    for (const ext of ["png", "jpg", "jpeg", "svg"]) {
+      const key = `../../assets/avatars/${id}.${ext}`;
+      if (imageFiles[key]) return imageFiles[key];
+    }
+    return null;
   }
-  return null;
-}
 
-const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
-
+  const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
 
   // Svelte refs & state
   let container;
@@ -467,8 +468,6 @@ const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
         }
       })
       .on("pointerdown", (event, d) => {
-        // ✅ Click node to pin + show its connections,
-        // even if search is active.
         if (pinned?.type === "node" && pinned.id === d.id) {
           unpin();
           applySearchDimming(searchMatches(searchTerm));
@@ -476,12 +475,8 @@ const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
         } else {
           pinned = { type: "node", id: d.id };
           showInfo(nodeHTML(d));
-
-          // Keep search/category “mode” applied
           applySearchDimming(searchMatches(searchTerm));
           applyCategoryDimming();
-
-          // Then enforce neighborhood focus
           applyFocus(d.id);
         }
         event.stopPropagation();
@@ -578,10 +573,24 @@ const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
   }
 
+  // ✅ scrolly unsubscribe holder (new)
+  let unsubscribeScrolly;
+
   let _onWinResize, _onLoad;
 
   onMount(() => {
     init();
+
+    // ✅ Listen for scrolly commands (new)
+    unsubscribeScrolly = scrollyCommand.subscribe((cmd) => {
+      if (!cmd) return;
+      if (!container) return;
+
+      if (cmd.type === "highlightFilters") {
+        const el = container.querySelector("[data-ui='filters']");
+        if (el) el.classList.toggle("coach-highlight", !!cmd.on);
+      }
+    });
 
     try {
       if (window.pym) pymChild = new window.pym.Child();
@@ -598,6 +607,7 @@ const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
   });
 
   onDestroy(() => {
+    unsubscribeScrolly?.(); // ✅ new
     window.removeEventListener("resize", _onWinResize);
     window.removeEventListener("load", _onLoad);
     simulation?.stop();
@@ -609,7 +619,7 @@ const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
   <div class="chart" bind:this={container}>
     <div class="controls" on:pointerdown|stopPropagation>
       <!-- Desktop pills -->
-      <div class="controls-buttons">
+      <div class="controls-buttons" data-ui="filters">
         <button
           class="button"
           class:primary={selectedGroups.size === 0}

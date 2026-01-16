@@ -535,31 +535,24 @@
     applySearchDimming(searchMatches(searchTerm));
   }
 
- function resize() {
-  if (!container || !svg) return;
+  function resize() {
+    if (!container) return;
 
-  const w = Math.round(container.clientWidth || 800);
-  const isMobile = window.matchMedia("(max-width: 640px)").matches;
+    const w = Math.round(container.clientWidth || 800);
+    const isMobile = window.matchMedia("(max-width: 640px)").matches;
 
-  width = w;
+    width = w;
+    height = isMobile ? 600 : Math.max(420, Math.min(860, Math.round(w * 0.68)));
 
-  if (isMobile) {
-    // Mobile: minimum height, allow growth if width is large
-    height = Math.max(420, Math.round(w * 0.9));
-  } else {
-    // Desktop: fixed height
-    height = 520;
+    svg.attr("width", width).attr("height", height);
+
+    simulation
+      ?.force("center", d3.forceCenter(width / 2, height / 2))
+      .alpha(0.4)
+      .restart();
+
+    reservePanelSpace();
   }
-
-  svg.attr("width", width).attr("height", height);
-
-  simulation
-    ?.force("center", d3.forceCenter(width / 2, height / 2))
-    .force("x", d3.forceX(width / 2).strength(0.08))
-    .force("y", d3.forceY(height / 2).strength(0.08))
-    .alpha(0.4)
-    .restart();
-}
 
   function drag() {
     function dragstarted(event, d) {
@@ -584,9 +577,6 @@
 
   onMount(() => {
     init();
-
-    // ✅ Listen for scrolly commands (new)
-
     try {
       if (window.pym) pymChild = new window.pym.Child();
     } catch {}

@@ -55,7 +55,7 @@
 *::after { box-sizing: border-box; }
 
 html, body {
-  min-height: 90%;
+  min-height: 100%;
   margin: 0;
   padding: 0;
   background: var(--bg);
@@ -142,7 +142,7 @@ a:hover { text-decoration: underline; }
   max-width: 900px;
   width: 100%;
   margin: 16px auto 0;
-  padding-bottom: 0;
+  padding-bottom: var(--panel-overlap);
   position: relative;     /* anchor overlay controls */
   font-family: var(--font-sans);
 }

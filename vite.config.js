@@ -11,8 +11,7 @@ export default defineConfig({
     assetsDir: "assets",
     rollupOptions: {
       input: {
-        network: path.resolve(__dirname, "network/index.html"),
-        scrolly: path.resolve(__dirname, "scrolly/index.html"),
+        network: path.resolve(__dirname, "network/index.html")
       },
     },
   },

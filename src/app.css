@@ -1,36 +1,37 @@
+/* styles.css (FULL, overlay controls at top; NO grey boxes) */
+
 /* --------- Global baseline (reusable across charts) --------- */
+
 :root {
   /* Typography */
   --font-sans: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
   /* Color palette (light theme by default) */
   --bg: #ffffff;
-  --text: #1f2937;
-  /* slate-800 */
-  --muted: #6b7280;
-  /* slate-500 */
-  --line: #e5e7eb;
-  /* gray-200 */
-  --panel: #f8fafc;
-  /* slate-50 */
+  --text: #1f2937;         /* slate-800 */
+  --muted: #6b7280;        /* slate-500 */
+  --line: #e5e7eb;         /* gray-200 */
+  --panel: #f8fafc;        /* slate-50 */
+
   /* Accents (your prefs) */
-  --accent: #f67cf6;
-  /* inspiration pink */
-  --accent-2: #0dd6c7;
-  /* teal */
+  --accent: #f67cf6;       /* inspiration pink */
+  --accent-2: #0dd6c7;     /* teal */
   --warn: #ffa500;
   --ok: #46c134;
+
   /* Chart helpers */
   --node-stroke: #333;
-  --link: #9aa3af;
-  /* gray-400 */
+  --link: #9aa3af;         /* gray-400 */
   --tooltip-bg: #fff;
   --tooltip-border: #e5e7eb;
+
   /* Sizing & rhythm */
   --maxw: 960px;
   --gutter: 16px;
   --radius: 12px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .06);
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+
   color-scheme: light;
 }
 
@@ -51,12 +52,9 @@
 /* Reset-ish */
 *,
 *::before,
-*::after {
-  box-sizing: border-box;
-}
+*::after { box-sizing: border-box; }
 
-html,
-body {
+html, body {
   min-height: 100%;
   margin: 0;
   padding: 0;
@@ -77,46 +75,22 @@ body {
 }
 
 /* Headings */
-h1,
-h2,
-h3 {
+h1, h2, h3 {
   margin: 0 0 0.5em;
   line-height: 1.2;
   font-weight: 600;
 }
-
-h1 {
-  font-size: clamp(1.6rem, 2vw + 1rem, 2.2rem);
-}
-
-h2 {
-  font-size: clamp(1.3rem, 1.2vw + 1rem, 1.6rem);
-}
-
-h3 {
-  font-size: 1.125rem;
-}
+h1 { font-size: clamp(1.6rem, 2vw + 1rem, 2.2rem); }
+h2 { font-size: clamp(1.3rem, 1.2vw + 1rem, 1.6rem); }
+h3 { font-size: 1.125rem; }
 
 /* Text */
-p {
-  margin: 0 0 0.8em;
-  color: var(--text);
-}
-
-small,
-.muted {
-  color: var(--muted);
-}
+p { margin: 0 0 0.8em; color: var(--text); }
+small, .muted { color: var(--muted); }
 
 /* Links */
-a {
-  color: var(--accent-2);
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
+a { color: var(--accent-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
 
 /* Buttons */
 .button {
@@ -130,20 +104,13 @@ a:hover {
   cursor: pointer;
   transition: background .2s, border-color .2s;
 }
-
-.button:hover {
-  border-color: var(--accent);
-}
-
+.button:hover { border-color: var(--accent); }
 .button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #000;
 }
-
-.button.ghost {
-  background: transparent;
-}
+.button.ghost { background: transparent; }
 
 /* Tooltip — reusable */
 .tooltip {
@@ -159,22 +126,16 @@ a:hover {
   box-shadow: var(--shadow);
 }
 
-/* ============================================================ Network chart namespace ============================================================ */
-.network-chart {
-  --panel-overlap: 64px;
-}
+/* ============================================================
+   Network chart namespace
+   ============================================================ */
 
-@media (max-width: 640px) {
-  .network-chart {
-    --panel-overlap: 72px;
-  }
-}
+.network-chart { --panel-overlap: 64px; }
+@media (max-width: 640px) { .network-chart { --panel-overlap: 72px; } }
 
 .network-chart,
 .network-chart .chart,
-.network-chart .net-svg {
-  overflow: visible !important;
-}
+.network-chart .net-svg { overflow: visible !important; }
 
 /* Chart wrapper */
 .network-chart .chart {
@@ -182,16 +143,13 @@ a:hover {
   width: 100%;
   margin: 16px auto 0;
   padding-bottom: var(--panel-overlap);
-  position: relative;
-  /* anchor overlay controls */
+  position: relative;     /* anchor overlay controls */
   font-family: var(--font-sans);
 }
 
 /* Mobile cap */
 @media (max-width: 640px) {
-  .network-chart .chart {
-    max-width: 300px;
-  }
+  .network-chart .chart { max-width: 300px; }
 }
 
 /* The SVG used by your network */
@@ -200,6 +158,7 @@ a:hover {
   width: 100%;
   height: auto;
   background: #fafafa;
+
   /* ✅ NO grey outline box around the chart */
   border: none;
   border-radius: 8px;
@@ -226,7 +185,6 @@ a:hover {
     left: 50%;
     transform: translateX(-50%) translateY(calc(-1 * var(--panel-overlap)));
   }
-
   .network-chart .info-content {
     display: block;
     width: 100%;
@@ -239,7 +197,7 @@ a:hover {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, .12);
+  box-shadow: 0 2px 12px rgba(0,0,0,.12);
   padding: 10px 12px;
   font-size: 14px;
   line-height: 1.35;
@@ -252,11 +210,14 @@ a:hover {
   .network-chart .info-content {
     background: var(--tooltip-bg);
     border-color: var(--tooltip-border);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, .4);
+    box-shadow: 0 2px 12px rgba(0,0,0,.4);
   }
 }
 
-/* ============================================================ Controls: OVERLAY at top, but NO grey panel/background ============================================================ */
+/* ============================================================
+   Controls: OVERLAY at top, but NO grey panel/background
+   ============================================================ */
+
 .network-chart .controls {
   position: absolute;
   top: 10px;
@@ -264,10 +225,12 @@ a:hover {
   right: 10px;
   z-index: 20;
   pointer-events: auto;
+
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
+
   /* ✅ remove the big grey outline box */
   background: transparent;
   border: none;
@@ -283,34 +246,23 @@ a:hover {
 }
 
 /* Mobile dropdown toggle area (if you use it) */
-.network-chart .controls-select {
-  display: none;
-}
+.network-chart .controls-select { display: none; }
 
 @media (max-width: 640px) {
-  .network-chart .controls-buttons {
-    display: none;
-  }
-
-  .network-chart .controls-select {
-    display: block;
-    width: 100%;
-  }
-
-  .network-chart .controls-select .button {
-    width: 100%;
-    text-align: left;
-  }
+  .network-chart .controls-buttons { display: none; }
+  .network-chart .controls-select { display: block; width: 100%; }
+  .network-chart .controls-select .button { width: 100%; text-align: left; }
 }
 
 /* Dropdown panel styling (kept, but not a big wrapper box) */
 .network-chart .filter-pop {
   margin-top: 8px;
-  background: rgba(255, 255, 255, 0.97);
+  background: rgba(255,255,255,0.97);
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: var(--shadow);
   padding: 10px;
+
   max-height: 45vh;
   overflow: auto;
 }
@@ -328,18 +280,21 @@ a:hover {
   padding: 6px 2px;
   font-size: 0.95rem;
 }
-
 .network-chart .filter-item input[type="checkbox"] {
   width: 18px;
   height: 18px;
   accent-color: var(--accent-2);
 }
 
-/* ============================================================ Search UI: narrow, NO extra grey box ============================================================ */
+/* ============================================================
+   Search UI: narrow, NO extra grey box
+   ============================================================ */
+
 .network-chart .controls-search {
   display: flex;
   align-items: center;
   gap: 10px;
+
   /* ✅ no background/border wrapper */
   background: transparent;
   border: none;
@@ -347,11 +302,11 @@ a:hover {
 }
 
 .network-chart .search-input {
-  width: 260px;
-  /* tweak */
+  width: 260px;      /* tweak */
   max-width: 70vw;
+
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255,255,255,0.95);
   color: var(--text);
   border-radius: 999px;
   padding: 0.45rem 0.8rem;
@@ -382,98 +337,72 @@ a:hover {
 
 /* Mobile: let search fill width */
 @media (max-width: 640px) {
-  .network-chart .controls-search {
-    width: 100%;
-  }
-
-  .network-chart .search-input {
-    width: 100%;
-    max-width: none;
-  }
+  .network-chart .controls-search { width: 100%; }
+  .network-chart .search-input { width: 100%; max-width: none; }
 }
 
-/* ============================================================ Hover focus (existing) ============================================================ */
+/* ============================================================
+   Hover focus (existing)
+   ============================================================ */
+
 .network-chart .nodes circle.is-dim {
   opacity: 0.15;
   filter: grayscale(1);
 }
-
 .network-chart .links line.is-dim {
   stroke-opacity: 0.08;
 }
-
 .network-chart .nodes circle.is-hi {
   opacity: 1;
   filter: none;
   stroke: #666;
   stroke-width: 3px;
 }
-
 .network-chart .links line.is-hi {
   stroke-opacity: 0.95;
   stroke: #666;
   stroke-width: 3px;
 }
 
-/* ============================================================ Category selection dimming ============================================================ */
-.network-chart .nodes circle.is-cat-dim {
-  opacity: 0.12;
-}
+/* ============================================================
+   Category selection dimming
+   ============================================================ */
 
-.network-chart .links line.is-cat-dim {
-  stroke-opacity: 0.08;
-}
-
-.network-chart .nodes circle.is-cat-hi {
-  opacity: 1;
-}
-
-.network-chart .links line.is-cat-hi {
-  stroke-opacity: 0.55;
-}
+.network-chart .nodes circle.is-cat-dim { opacity: 0.12; }
+.network-chart .links line.is-cat-dim { stroke-opacity: 0.08; }
+.network-chart .nodes circle.is-cat-hi { opacity: 1; }
+.network-chart .links line.is-cat-hi { stroke-opacity: 0.55; }
 
 /* Hover focus should override category dim visually */
-.network-chart .nodes circle.is-hi {
-  opacity: 1 !important;
-}
+.network-chart .nodes circle.is-hi { opacity: 1 !important; }
+.network-chart .links line.is-hi { stroke-opacity: 0.95 !important; }
+.network-chart .nodes circle.is-dim { opacity: 0.08 !important; }
+.network-chart .links line.is-dim { stroke-opacity: 0.05 !important; }
 
-.network-chart .links line.is-hi {
-  stroke-opacity: 0.95 !important;
-}
+/* ============================================================
+   Search dimming/highlight classes
+   ============================================================ */
 
-.network-chart .nodes circle.is-dim {
-  opacity: 0.08 !important;
-}
-
-.network-chart .links line.is-dim {
-  stroke-opacity: 0.05 !important;
-}
-
-/* ============================================================ Search dimming/highlight classes ============================================================ */
 .network-chart .nodes circle.is-search-dim {
   opacity: 0.08 !important;
   filter: grayscale(1);
 }
-
 .network-chart .links line.is-search-dim {
   stroke-opacity: 0.05 !important;
 }
-
 .network-chart .nodes circle.is-search-hi {
   opacity: 1 !important;
   filter: none !important;
   stroke: #666;
   stroke-width: 3px;
 }
-
 .network-chart .links line.is-search-hi {
   stroke-opacity: 0.55 !important;
 }
 
 /* scrolly coaching highlight */
 .coach-highlight {
-  outline: 3px solid rgba(246, 124, 246, 0.95);
-  /* your pink */
+  outline: 3px solid rgba(246, 124, 246, 0.95); /* your pink */
   outline-offset: 6px;
   border-radius: 14px;
 }

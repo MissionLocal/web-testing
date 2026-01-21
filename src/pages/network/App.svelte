@@ -578,33 +578,29 @@
 
   let _onWinResize, _onLoad;
 
-  onMount(() => {
-    init();
+onMount(() => {
+  init();
 
-    // ✅ Listen for scrolly commands (new)
-    unsubscribeScrolly = scrollyCommand.subscribe((cmd) => {
-      if (!cmd) return;
-      if (!container) return;
+  try {
+    if (window.pym) pymChild = new window.pym.Child();
+  } catch {}
 
-      if (cmd.type === "highlightFilters") {
-        const el = container.querySelector("[data-ui='filters']");
-        if (el) el.classList.toggle("coach-highlight", !!cmd.on);
-      }
-    });
+  // ✅ extra height sends after layout settles
+  requestAnimationFrame(postHeight);
+  setTimeout(postHeight, 250);
+  setTimeout(postHeight, 1000);
 
-    try {
-      if (window.pym) pymChild = new window.pym.Child();
-    } catch {}
+  _onLoad = () => postHeight();
+  window.addEventListener("load", _onLoad);
 
-    _onLoad = () => postHeight();
-    window.addEventListener("load", _onLoad);
+  _onWinResize = () => {
+    resize();
+    postHeight();
+  };
+  window.addEventListener("resize", _onWinResize);
+});
 
-    _onWinResize = () => {
-      resize();
-      postHeight();
-    };
-    window.addEventListener("resize", _onWinResize);
-  });
+
 
   onDestroy(() => {
     unsubscribeScrolly?.(); // ✅ new

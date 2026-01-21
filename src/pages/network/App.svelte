@@ -4,7 +4,7 @@
 
   import graph from "../data/graph.json";
 
-  // ✅ Scrolly command listener (new)
+  // ✅ Scrolly command listener
   import { scrollyCommand } from "../../lib/scrollyController";
 
   // ---- MASTER DATA (unchanged references) ----
@@ -38,15 +38,8 @@
   function clearSearchDimming() {
     if (!gNodes || !gLinks) return;
 
-    gNodes
-      .selectAll("circle")
-      .classed("is-search-hi", false)
-      .classed("is-search-dim", false);
-
-    gLinks
-      .selectAll("line")
-      .classed("is-search-hi", false)
-      .classed("is-search-dim", false);
+    gNodes.selectAll("circle").classed("is-search-hi", false).classed("is-search-dim", false);
+    gLinks.selectAll("line").classed("is-search-hi", false).classed("is-search-dim", false);
 
     searchStatus = "";
   }
@@ -76,10 +69,7 @@
 
     gLinks
       .selectAll("line")
-      .classed(
-        "is-search-hi",
-        (l) => matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l)),
-      )
+      .classed("is-search-hi", (l) => matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l)))
       .classed(
         "is-search-dim",
         (l) => !(matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l))),
@@ -96,9 +86,7 @@
 
     // If something is pinned, keep its connections visible.
     if (pinned?.type === "node") applyFocus(pinned.id);
-    if (pinned?.type === "link" && pinned.key) {
-      // no-op; link focus is applied when pinned
-    }
+    // if pinned link: focus is already applied when pinned
   }
 
   function clearSearch() {
@@ -154,9 +142,7 @@
 
   // Colors
   const allGroups = Array.from(
-    new Set(
-      allNodes.flatMap((n) => (n.groups?.length ? [n.groups[0]] : ["other"])),
-    ),
+    new Set(allNodes.flatMap((n) => (n.groups?.length ? [n.groups[0]] : ["other"]))),
   );
   const color = d3.scaleOrdinal().domain(allGroups).range(d3.schemeSet2);
 
@@ -213,14 +199,8 @@
 
     gLinks
       .selectAll("line")
-      .classed(
-        "is-hi",
-        (l) => linkSourceId(l) === nodeId || linkTargetId(l) === nodeId,
-      )
-      .classed(
-        "is-dim",
-        (l) => !(linkSourceId(l) === nodeId || linkTargetId(l) === nodeId),
-      );
+      .classed("is-hi", (l) => linkSourceId(l) === nodeId || linkTargetId(l) === nodeId)
+      .classed("is-dim", (l) => !(linkSourceId(l) === nodeId || linkTargetId(l) === nodeId));
   }
 
   function applyLinkFocus(l) {
@@ -310,6 +290,7 @@
       if (next.has(g)) next.delete(g);
       else next.add(g);
 
+      // If everything is selected, collapse back to "All"
       if (groupOptions.every((opt) => next.has(opt))) {
         next = new Set();
       }
@@ -330,10 +311,28 @@
 
   // ---- Pym (optional/guarded) ----
   let pymChild = null;
+
   function postHeight() {
     try {
       if (pymChild) pymChild.sendHeight();
     } catch {}
+  }
+
+  // ✅ Best WP fix: observe real height changes (so byline never clips)
+  let ro;
+  let heightRaf = 0;
+
+  function startHeightObserver() {
+    if (!pymChild || typeof ResizeObserver === "undefined") return;
+
+    ro = new ResizeObserver(() => {
+      cancelAnimationFrame(heightRaf);
+      heightRaf = requestAnimationFrame(() => postHeight());
+    });
+
+    // Observe the whole doc
+    ro.observe(document.documentElement);
+    ro.observe(document.body);
   }
 
   const PANEL_RESERVE_PX = 10;
@@ -345,11 +344,14 @@
   function showInfo(html) {
     infoHTML = html;
     infoVisible = true;
+    // If panel affects height, nudge pym once
+    requestAnimationFrame(postHeight);
   }
 
   function hideInfo(force = false) {
     if (!force && isPinned()) return;
     infoVisible = false;
+    requestAnimationFrame(postHeight);
   }
 
   function init() {
@@ -533,6 +535,9 @@
 
     applyCategoryDimming();
     applySearchDimming(searchMatches(searchTerm));
+
+    // One more nudge after init
+    requestAnimationFrame(postHeight);
   }
 
   function resize() {
@@ -546,10 +551,7 @@
 
     svg.attr("width", width).attr("height", height);
 
-    simulation
-      ?.force("center", d3.forceCenter(width / 2, height / 2))
-      .alpha(0.4)
-      .restart();
+    simulation?.force("center", d3.forceCenter(width / 2, height / 2)).alpha(0.4).restart();
 
     reservePanelSpace();
   }
@@ -573,39 +575,56 @@
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
   }
 
-  // ✅ scrolly unsubscribe holder (new)
+  // ✅ scrolly unsubscribe holder
   let unsubscribeScrolly;
 
   let _onWinResize, _onLoad;
 
-onMount(() => {
-  init();
+  onMount(() => {
+    init();
 
-  try {
-    if (window.pym) pymChild = new window.pym.Child();
-  } catch {}
+    // ✅ Listen for scrolly commands
+    unsubscribeScrolly = scrollyCommand.subscribe((cmd) => {
+      if (!cmd) return;
+      if (!container) return;
 
-  // ✅ extra height sends after layout settles
-  requestAnimationFrame(postHeight);
-  setTimeout(postHeight, 250);
-  setTimeout(postHeight, 1000);
+      if (cmd.type === "highlightFilters") {
+        const el = container.querySelector("[data-ui='filters']");
+        if (el) el.classList.toggle("coach-highlight", !!cmd.on);
+      }
+    });
 
-  _onLoad = () => postHeight();
-  window.addEventListener("load", _onLoad);
+    try {
+      if (window.pym) pymChild = new window.pym.Child();
+    } catch {}
 
-  _onWinResize = () => {
-    resize();
-    postHeight();
-  };
-  window.addEventListener("resize", _onWinResize);
-});
+    // ✅ Observe height changes so WP iframe always fits (byline, etc.)
+    startHeightObserver();
 
+    // Still fine to do a few nudges
+    requestAnimationFrame(postHeight);
+    setTimeout(postHeight, 250);
+    setTimeout(postHeight, 1000);
 
+    _onLoad = () => postHeight();
+    window.addEventListener("load", _onLoad);
+
+    _onWinResize = () => {
+      resize();
+      postHeight();
+    };
+    window.addEventListener("resize", _onWinResize);
+  });
 
   onDestroy(() => {
-    unsubscribeScrolly?.(); // ✅ new
+    unsubscribeScrolly?.();
+
+    ro?.disconnect();
+    cancelAnimationFrame(heightRaf);
+
     window.removeEventListener("resize", _onWinResize);
     window.removeEventListener("load", _onLoad);
+
     simulation?.stop();
   });
 </script>
@@ -637,7 +656,7 @@ onMount(() => {
         {/each}
       </div>
 
-      <!-- Mobile dropdown (FIXED tags) -->
+      <!-- Mobile dropdown -->
       <div class="controls-select" on:pointerdown|stopPropagation>
         <button
           class="button"

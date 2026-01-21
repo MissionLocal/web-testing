@@ -68,11 +68,11 @@ html, body {
 }
 
 /* Root app container */
-#app {
+/* #app {
   margin: 0 auto;
   max-width: var(--maxw);
   padding: 0 var(--gutter);
-}
+} */
 
 /* Headings */
 h1, h2, h3 {
@@ -405,4 +405,33 @@ a:hover { text-decoration: underline; }
   outline: 3px solid rgba(246, 124, 246, 0.95); /* your pink */
   outline-offset: 6px;
   border-radius: 14px;
+}
+
+
+/* Embed wrapper so byline aligns with app width/padding */
+.embed {
+  margin: 0 auto;
+  max-width: var(--maxw);
+  padding: 0 var(--gutter);
+}
+
+/* Root app container */
+#app {
+  margin: 0 auto;
+  max-width: var(--maxw);
+  padding: 0; /* moved padding to .embed so byline matches */
+}
+
+/* Byline under chart */
+.byline {
+  margin: 8px auto 18px;
+  font: 500 0.85rem/1.25 var(--font-sans);
+  color: var(--muted);
+}
+
+/* Optional: center it on mobile */
+@media (max-width: 640px) {
+  .byline {
+    text-align: center;
+  }
 }

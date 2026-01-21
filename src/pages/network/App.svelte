@@ -737,35 +737,6 @@
   </div>
 
   <!-- ✅ Byline INSIDE the app so pym always measures it -->
-  <div class="byline">By <strong>Kelly Waldron</strong> • Mission Local</div>
+  <div class="byline">Eleni Balakrishnan & Kelly Waldron • Mission Local</div>
 </div>
 
-<style>
-  /* Byline */
-  .byline {
-    margin: 10px auto 18px;
-    font: 500 0.85rem/1.25 var(--font-sans, "Barlow", system-ui, sans-serif);
-    color: var(--muted, #6b7280);
-    text-align: center;
-  }
-
-  /* ✅ Mobile fix: dropdown should cover search bar */
-  @media (max-width: 640px) {
-    :global(.network-chart .controls-select) {
-      position: relative;
-      z-index: 50;
-    }
-    :global(.network-chart .controls-search) {
-      position: relative;
-      z-index: 10; /* below dropdown */
-    }
-    :global(.network-chart .filter-pop) {
-      position: absolute;
-      top: calc(100% + 8px);
-      left: 0;
-      right: 0;
-      z-index: 60;
-      margin-top: 0; /* override any existing margin */
-    }
-  }
-</style>

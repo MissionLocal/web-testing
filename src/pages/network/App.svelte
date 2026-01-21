@@ -336,7 +336,7 @@
     } catch {}
   }
 
-  const PANEL_RESERVE_PX = 140;
+  const PANEL_RESERVE_PX = 100;
   function reservePanelSpace() {
     if (!container) return;
     container.style.setProperty("--panel-overlap", PANEL_RESERVE_PX + "px");
@@ -573,10 +573,25 @@
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
   }
 
+  // ✅ scrolly unsubscribe holder (new)
+  let unsubscribeScrolly;
+
   let _onWinResize, _onLoad;
 
   onMount(() => {
     init();
+
+    // ✅ Listen for scrolly commands (new)
+    unsubscribeScrolly = scrollyCommand.subscribe((cmd) => {
+      if (!cmd) return;
+      if (!container) return;
+
+      if (cmd.type === "highlightFilters") {
+        const el = container.querySelector("[data-ui='filters']");
+        if (el) el.classList.toggle("coach-highlight", !!cmd.on);
+      }
+    });
+
     try {
       if (window.pym) pymChild = new window.pym.Child();
     } catch {}
@@ -592,6 +607,7 @@
   });
 
   onDestroy(() => {
+    unsubscribeScrolly?.(); // ✅ new
     window.removeEventListener("resize", _onWinResize);
     window.removeEventListener("load", _onLoad);
     simulation?.stop();

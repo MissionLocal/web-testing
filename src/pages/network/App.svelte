@@ -13,8 +13,6 @@
   const nodes = allNodes;
   const links = allLinks;
 
-  const nodeById = new Map(allNodes.map((d) => [d.id, d]));
-
   // ---- SEARCH UI STATE ----
   let searchTerm = "";
   let searchStatus = "";
@@ -134,14 +132,14 @@
   let container;
   let infoPanelEl;
 
-  let svg, defs, gRoot, gLinks, gNodes, gLabels; // ✅ gLabels is shared
+  let svg, defs, gRoot, gLinks, gNodes, gLabels, gLinkHits;
   let width = 800,
     height = 500;
   let simulation;
 
   let linkSel;
   let nodeSel;
-  let labelSel; // ✅ keep selection
+  let labelSel;
 
   // Info panel / pin state
   let pinned = null; // null | { type: "node", id } | { type: "link", key }
@@ -229,7 +227,6 @@
 
     gLinks.selectAll("line").classed("is-hi", (lnk) => lnk === l).classed("is-dim", (lnk) => lnk !== l);
 
-    // optional: hide node labels when hovering links
     if (!isPinned()) hideAllLabels();
   }
 
@@ -253,7 +250,7 @@
     pinned = null;
     hideInfo(true);
     clearFocus();
-    hideAllLabels(); // ✅
+    hideAllLabels();
   }
 
   // ---- Category dimming ----
@@ -372,38 +369,44 @@
 
     defs = svg.append("defs");
     gRoot = svg.append("g");
-    gLinks = gRoot.append("g").attr("class", "links");
-    gNodes = gRoot.append("g").attr("class", "nodes");
-    gLabels = gRoot.append("g").attr("class", "labels"); // ✅ assign to shared var
 
-    // Links
+    // ✅ Put hit targets above visible links but below nodes
+    gLinks = gRoot.append("g").attr("class", "links");
+    gLinkHits = gRoot.append("g").attr("class", "link-hits");
+    gNodes = gRoot.append("g").attr("class", "nodes");
+    gLabels = gRoot.append("g").attr("class", "labels");
+
+    // Visible Links (appearance unchanged)
     linkSel = gLinks
       .selectAll("line")
       .data(links, (d) => (d.source.id ?? d.source) + "->" + (d.target.id ?? d.target))
       .join("line")
       .attr("stroke", "#999")
       .attr("stroke-opacity", 0.6)
-      .attr("stroke-width", (d) => 1 + 3 * (d.strength ?? 0.5))
+      .attr("stroke-width", (d) => 1 + 3 * (d.strength ?? 0.5));
+
+    // ✅ Invisible wide hit targets for links (mobile friendly)
+    const isMobileNow = window.matchMedia("(max-width: 640px)").matches;
+    const HIT_PX = isMobileNow ? 22 : 14;
+
+    const linkHitSel = gLinkHits
+      .selectAll("line")
+      .data(links, (d) => (d.source.id ?? d.source) + "->" + (d.target.id ?? d.target))
+      .join("line")
+      .attr("stroke", "transparent")
+      .attr("stroke-width", HIT_PX)
       .style("cursor", "pointer")
       .style("pointer-events", "stroke")
-      .on("pointerenter", function (event, d) {
-        this.parentNode.appendChild(this);
-        d3.select(this)
-          .attr("stroke-opacity", 0.95)
-          .attr("stroke", "#666")
-          .attr("stroke-width", (d2) => 2 + 3 * (d2.strength ?? 0.5));
+      .on("pointerenter", (event, d) => {
+        // bring visible link to top (within its group)
+        linkSel.filter((x) => x === d).raise();
 
         if (!isPinned()) {
           applyLinkFocus(d);
           showInfo(linkHTML(d));
         }
       })
-      .on("pointerleave", function () {
-        d3.select(this)
-          .attr("stroke", "#999")
-          .attr("stroke-opacity", 0.6)
-          .attr("stroke-width", (d) => 1 + 3 * (d.strength ?? 0.5));
-
+      .on("pointerleave", () => {
         if (!isPinned()) {
           clearFocus();
           hideInfo(true);
@@ -467,14 +470,14 @@
         if (!isPinned()) {
           applyFocus(d.id);
           showInfo(nodeHTML(d));
-          showOnlyLabel(d.id); // ✅ show small label
+          showOnlyLabel(d.id);
         }
       })
       .on("pointerleave", () => {
         if (!isPinned()) {
           clearFocus();
           hideInfo(true);
-          hideAllLabels(); // ✅
+          hideAllLabels();
         }
       })
       .on("pointerdown", (event, d) => {
@@ -488,13 +491,13 @@
           applySearchDimming(searchMatches(searchTerm));
           applyCategoryDimming();
           applyFocus(d.id);
-          showOnlyLabel(d.id); // ✅ pinned label stays
+          showOnlyLabel(d.id);
         }
         event.stopPropagation();
       })
       .call(drag());
 
-    // ✅ Labels (hidden by default)
+    // Labels (hidden default)
     labelSel = gLabels
       .selectAll("text")
       .data(nodes, (d) => d.id)
@@ -539,15 +542,25 @@
       .on("tick", () => {
         nodes.forEach(clampNode);
 
+        // visible links
         linkSel
           .attr("x1", (d) => d.source.x)
           .attr("y1", (d) => d.source.y)
           .attr("x2", (d) => d.target.x)
           .attr("y2", (d) => d.target.y);
 
+        // ✅ link hit targets match same coords
+        gLinkHits
+          .selectAll("line")
+          .attr("x1", (d) => d.source.x)
+          .attr("y1", (d) => d.source.y)
+          .attr("x2", (d) => d.target.x)
+          .attr("y2", (d) => d.target.y);
+
+        // nodes
         gNodes.selectAll("circle").attr("cx", (d) => d.x).attr("cy", (d) => d.y);
 
-        // ✅ keep labels attached to nodes
+        // labels follow nodes
         gLabels.selectAll("text").attr("x", (d) => d.x).attr("y", (d) => d.y);
       });
 

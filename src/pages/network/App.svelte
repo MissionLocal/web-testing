@@ -336,7 +336,7 @@
     } catch {}
   }
 
-  const PANEL_RESERVE_PX = 100;
+  const PANEL_RESERVE_PX = 80;
   function reservePanelSpace() {
     if (!container) return;
     container.style.setProperty("--panel-overlap", PANEL_RESERVE_PX + "px");

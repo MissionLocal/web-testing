@@ -5,15 +5,14 @@
   import graph from "../data/graph.json";
   import { scrollyCommand } from "../../lib/scrollyController";
 
-  // ---- MASTER DATA ----
+  // ---- DATA ----
   const allNodes = graph.nodes;
   const allLinks = graph.links;
 
-  // ---- CURRENT VIEW ----
   const nodes = allNodes;
   const links = allLinks;
 
-  // ---- SEARCH UI STATE ----
+  // ---- SEARCH UI ----
   let searchTerm = "";
   let searchStatus = "";
 
@@ -40,10 +39,8 @@
 
   function clearSearchDimming() {
     if (!gNodes || !gLinks) return;
-
     gNodes.selectAll("circle").classed("is-search-hi", false).classed("is-search-dim", false);
     gLinks.selectAll("line").classed("is-search-hi", false).classed("is-search-dim", false);
-
     searchStatus = "";
   }
 
@@ -56,7 +53,6 @@
     }
 
     const matchCount = matchIds.size;
-
     if (matchCount === 0) {
       clearSearchDimming();
       searchStatus = "No matches";
@@ -72,10 +68,7 @@
 
     gLinks
       .selectAll("line")
-      .classed(
-        "is-search-hi",
-        (l) => matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l)),
-      )
+      .classed("is-search-hi", (l) => matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l)))
       .classed(
         "is-search-dim",
         (l) => !(matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l))),
@@ -90,6 +83,9 @@
     applyCategoryDimming();
 
     if (pinned?.type === "node") applyFocus(pinned.id);
+    if (pinned?.type === "link" && pinned.key) {
+      // link focus/labels already pinned
+    }
   }
 
   function clearSearch() {
@@ -100,8 +96,8 @@
     if (pinned?.type === "node") applyFocus(pinned.id);
   }
 
-  // ---- FILTER UI STATE ----
-  let selectedGroups = new Set();
+  // ---- FILTER UI ----
+  let selectedGroups = new Set(); // empty Set == "All"
   const isAllSelected = () => selectedGroups.size === 0;
 
   let mobileFilterOpen = false;
@@ -111,7 +107,34 @@
     new Set(allNodes.flatMap((n) => (n.groups?.length ? n.groups : ["other"]))),
   ).sort();
 
-  // Avatars
+  function toggleGroup(g) {
+    let next;
+
+    if (g === "all") {
+      next = new Set();
+    } else {
+      next = new Set(selectedGroups);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+
+      if (groupOptions.every((opt) => next.has(opt))) next = new Set();
+    }
+
+    selectedGroups = next;
+
+    // Clear pin + focus when changing filter
+    pinned = null;
+    hideInfo(true);
+    clearFocus();
+    hideAllLabels();
+
+    applySearchDimming(searchMatches(searchTerm));
+    applyCategoryDimming();
+
+    filterRenderKey += 1;
+  }
+
+  // ---- AVATARS ----
   const imageFiles = import.meta.glob("../../assets/avatars/*.{png,jpg,jpeg,svg}", {
     eager: true,
     as: "url",
@@ -127,7 +150,7 @@
 
   const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
 
-  // Svelte refs & state
+  // ---- D3 STATE ----
   let wrapper;
   let container;
   let infoPanelEl;
@@ -137,31 +160,17 @@
     height = 500;
   let simulation;
 
-  let linkSel;
-  let nodeSel;
-  let labelSel;
+  let linkSel, nodeSel, labelSel;
 
-  // Info panel / pin state
+  // ---- INFO PANEL / PIN ----
   let pinned = null; // null | { type: "node", id } | { type: "link", key }
   let infoVisible = false;
   let infoHTML = "";
 
-  // Colors
-  const allGroups = Array.from(
-    new Set(allNodes.flatMap((n) => (n.groups?.length ? [n.groups[0]] : ["other"]))),
-  );
-  const color = d3.scaleOrdinal().domain(allGroups).range(d3.schemeSet2);
-
-  const r = (d) => 6 + d.size * 4;
-
-  const PADDING = 4;
-  function clampNode(d) {
-    const rad = r(d) + PADDING;
-    d.x = Math.max(rad, Math.min(width - rad, d.x));
-    d.y = Math.max(rad, Math.min(height - rad, d.y));
+  function isPinned() {
+    return pinned !== null;
   }
 
-  // --- Safe HTML helpers (since we use {@html}) ---
   function escapeHTML(s) {
     return String(s ?? "")
       .replaceAll("&", "&amp;")
@@ -175,7 +184,6 @@
     return d.groups?.length ? d.groups[0] : "other";
   }
 
-  // ✅ Node info now includes group "pill" styled like your buttons
   const nodeHTML = (d) => {
     const label = escapeHTML(d.label);
     const desc = d.label_description ? escapeHTML(d.label_description) : "";
@@ -193,25 +201,41 @@
     return d.notes ? `<div class="info-description">${escapeHTML(d.notes)}</div>` : "";
   }
 
+  function showInfo(html) {
+    infoHTML = html;
+    infoVisible = true;
+    requestAnimationFrame(postHeight);
+  }
+
+  function hideInfo(force = false) {
+    if (!force && isPinned()) return;
+    infoVisible = false;
+    requestAnimationFrame(postHeight);
+  }
+
   function safeId(raw) {
     if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(raw);
     return String(raw).replace(/[^a-zA-Z0-9_-]/g, "_");
   }
 
-  function neighborsOf(nodeId) {
-    const neigh = new Set([nodeId]);
-    for (const l of links) {
-      const s = linkSourceId(l);
-      const t = linkTargetId(l);
-      if (s === nodeId) neigh.add(t);
-      else if (t === nodeId) neigh.add(s);
-    }
-    return neigh;
+  // ---- COLORS / SIZES ----
+  const allGroups = Array.from(
+    new Set(allNodes.flatMap((n) => (n.groups?.length ? [n.groups[0]] : ["other"]))),
+  );
+  const color = d3.scaleOrdinal().domain(allGroups).range(d3.schemeSet2);
+
+  const r = (d) => 6 + d.size * 4;
+
+  const PADDING = 4;
+  function clampNode(d) {
+    const rad = r(d) + PADDING;
+    d.x = Math.max(rad, Math.min(width - rad, d.x));
+    d.y = Math.max(rad, Math.min(height - rad, d.y));
   }
 
-  // ✅ LABELS: show/hide + clamp to stay inside SVG bounds
-  const LABEL_PAD = 6; // padding from edges
-  const LABEL_GAP = 8; // gap above node
+  // ---- LABELS (clamped inside SVG) ----
+  const LABEL_PAD = 6;
+  const LABEL_GAP = 8;
 
   function clampLabelToBounds(d, el) {
     const w = el.getComputedTextLength ? el.getComputedTextLength() : 60;
@@ -221,7 +245,7 @@
     const x = Math.max(minX, Math.min(maxX, d.x));
 
     const yAbove = d.y - (r(d) + LABEL_GAP);
-    const minY = 14; // baseline room at top
+    const minY = 14;
     const y = Math.max(minY, yAbove);
 
     return { x, y };
@@ -242,6 +266,18 @@
   function hideAllLabels() {
     if (!gLabels) return;
     gLabels.selectAll("text").style("opacity", 0);
+  }
+
+  // ---- FOCUS ----
+  function neighborsOf(nodeId) {
+    const neigh = new Set([nodeId]);
+    for (const l of links) {
+      const s = linkSourceId(l);
+      const t = linkTargetId(l);
+      if (s === nodeId) neigh.add(t);
+      else if (t === nodeId) neigh.add(s);
+    }
+    return neigh;
   }
 
   function applyFocus(nodeId) {
@@ -281,10 +317,6 @@
     gLinks.selectAll("line").classed("is-dim", false).classed("is-hi", false);
   }
 
-  function isPinned() {
-    return pinned !== null;
-  }
-
   function linkKey(l) {
     const s = linkSourceId(l);
     const t = linkTargetId(l);
@@ -298,7 +330,7 @@
     hideAllLabels();
   }
 
-  // ---- Category dimming ----
+  // ---- CATEGORY DIMMING ----
   function nodeGroups(n) {
     return n.groups?.length ? n.groups : ["other"];
   }
@@ -335,33 +367,7 @@
       .classed("is-cat-dim", (l) => !(hi.has(linkSourceId(l)) && hi.has(linkTargetId(l))));
   }
 
-  function toggleGroup(g) {
-    let next;
-
-    if (g === "all") {
-      next = new Set();
-    } else {
-      next = new Set(selectedGroups);
-      if (next.has(g)) next.delete(g);
-      else next.add(g);
-
-      if (groupOptions.every((opt) => next.has(opt))) next = new Set();
-    }
-
-    selectedGroups = next;
-
-    pinned = null;
-    hideInfo(true);
-    clearFocus();
-    hideAllLabels();
-
-    applySearchDimming(searchMatches(searchTerm));
-    applyCategoryDimming();
-
-    filterRenderKey += 1;
-  }
-
-  // ---- Pym ----
+  // ---- PYM ----
   let pymChild = null;
 
   function postHeight() {
@@ -370,6 +376,7 @@
     } catch {}
   }
 
+  // Observe wrapper size changes (includes byline + info panel)
   let ro;
   let heightRaf = 0;
 
@@ -390,18 +397,7 @@
     container.style.setProperty("--panel-overlap", PANEL_RESERVE_PX + "px");
   }
 
-  function showInfo(html) {
-    infoHTML = html;
-    infoVisible = true;
-    requestAnimationFrame(postHeight);
-  }
-
-  function hideInfo(force = false) {
-    if (!force && isPinned()) return;
-    infoVisible = false;
-    requestAnimationFrame(postHeight);
-  }
-
+  // ---- D3 INIT ----
   function init() {
     svg = d3
       .select(container)
@@ -413,13 +409,13 @@
     defs = svg.append("defs");
     gRoot = svg.append("g");
 
-    // Order: visible links, then hit targets, then nodes, then labels
+    // Order: visible links, then wide hit targets, then nodes, then labels
     gLinks = gRoot.append("g").attr("class", "links");
     gLinkHits = gRoot.append("g").attr("class", "link-hits");
     gNodes = gRoot.append("g").attr("class", "nodes");
     gLabels = gRoot.append("g").attr("class", "labels");
 
-    // Visible Links (appearance unchanged)
+    // Visible links (appearance unchanged)
     linkSel = gLinks
       .selectAll("line")
       .data(links, (d) => (d.source.id ?? d.source) + "->" + (d.target.id ?? d.target))
@@ -428,7 +424,7 @@
       .attr("stroke-opacity", 0.6)
       .attr("stroke-width", (d) => 1 + 3 * (d.strength ?? 0.5));
 
-    // Invisible wide hit targets for links (mobile friendly)
+    // Invisible wide hit targets for links (mobile-friendly)
     const isMobileNow = window.matchMedia("(max-width: 640px)").matches;
     const HIT_PX = isMobileNow ? 22 : 14;
 
@@ -441,22 +437,21 @@
       .style("cursor", "pointer")
       .style("pointer-events", "stroke")
       .on("pointerenter", (event, d) => {
+        // ✅ hover: focus + endpoint labels only (NO info box)
         linkSel.filter((x) => x === d).raise();
-
         if (!isPinned()) {
           applyLinkFocus(d);
-          showInfo(linkHTML(d));
-          showLinkEndpointLabels(d); // ✅ show two endpoint labels
+          showLinkEndpointLabels(d);
         }
       })
       .on("pointerleave", () => {
         if (!isPinned()) {
           clearFocus();
-          hideInfo(true);
           hideAllLabels();
         }
       })
       .on("pointerdown", (event, d) => {
+        // ✅ click: pin + show info + endpoint labels
         const k = linkKey(d);
 
         if (pinned?.type === "link" && pinned.key === k) {
@@ -465,9 +460,9 @@
           applyCategoryDimming();
         } else {
           pinned = { type: "link", key: k };
-          showInfo(linkHTML(d));
           applyLinkFocus(d);
-          showLinkEndpointLabels(d); // ✅ keep two labels visible when pinned
+          showLinkEndpointLabels(d);
+          showInfo(linkHTML(d)); // info only on click
         }
 
         event.stopPropagation();
@@ -511,31 +506,31 @@
         return circles;
       })
       .on("pointerenter", (event, d) => {
+        // ✅ hover: focus + label only (NO info box)
         if (!isPinned()) {
           applyFocus(d.id);
-          showInfo(nodeHTML(d));
           showOnlyLabel(d.id);
         }
       })
       .on("pointerleave", () => {
         if (!isPinned()) {
           clearFocus();
-          hideInfo(true);
           hideAllLabels();
         }
       })
       .on("pointerdown", (event, d) => {
+        // ✅ click: pin + show info + label
         if (pinned?.type === "node" && pinned.id === d.id) {
           unpin();
           applySearchDimming(searchMatches(searchTerm));
           applyCategoryDimming();
         } else {
           pinned = { type: "node", id: d.id };
-          showInfo(nodeHTML(d));
           applySearchDimming(searchMatches(searchTerm));
           applyCategoryDimming();
           applyFocus(d.id);
           showOnlyLabel(d.id);
+          showInfo(nodeHTML(d)); // info only on click
         }
         event.stopPropagation();
       })
@@ -548,7 +543,6 @@
       .join("text")
       .attr("class", "node-label")
       .attr("text-anchor", "middle")
-      .attr("dy", 0) // ✅ we set y explicitly in tick; don't double-offset with dy
       .text((d) => d.label)
       .style("opacity", 0)
       .style("pointer-events", "none");
@@ -568,9 +562,6 @@
       const t = l.target?.id ?? l.target;
       return idSet.has(s) && idSet.has(t);
     });
-
-    const dropped = links.length - cleanLinks.length;
-    if (dropped) console.warn(`Dropped ${dropped} links with missing nodes`);
 
     simulation = d3
       .forceSimulation(nodes)
@@ -601,7 +592,7 @@
         // nodes
         gNodes.selectAll("circle").attr("cx", (d) => d.x).attr("cy", (d) => d.y);
 
-        // ✅ labels clamped inside chart bounds
+        // clamped labels
         gLabels.selectAll("text").each(function (d) {
           const { x, y } = clampLabelToBounds(d, this);
           d3.select(this).attr("x", x).attr("y", y);
@@ -650,9 +641,8 @@
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
   }
 
-  // ✅ scrolly unsubscribe holder
+  // ---- SCROLLY + LIFECYCLE ----
   let unsubscribeScrolly;
-
   let _onWinResize, _onLoad;
 
   onMount(async () => {
@@ -692,7 +682,6 @@
 
   onDestroy(() => {
     unsubscribeScrolly?.();
-
     ro?.disconnect();
     cancelAnimationFrame(heightRaf);
 
@@ -703,7 +692,6 @@
   });
 </script>
 
-<!-- Wrapper -->
 <div class="network-chart" bind:this={wrapper}>
   <div class="chart" bind:this={container}>
     <div class="controls" on:pointerdown|stopPropagation>

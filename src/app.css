@@ -462,15 +462,27 @@ a:hover { text-decoration: underline; }
   stroke-linejoin: round;
 }
 
+/* ensure nothing clips byline/info */
+.network-chart { overflow: visible !important; }
+
+/* keep dropdown above search on mobile */
+@media (max-width: 640px) {
+  .network-chart .controls { z-index: 30; }
+  .network-chart .controls-select { position: relative; z-index: 40; }
+  .network-chart .filter-pop { position: absolute; z-index: 50; left: 0; right: 0; }
+  .network-chart .controls-search { position: relative; z-index: 10; }
+}
+
+/* info box header row + group pill */
 .info-head{
   display:flex;
   align-items:center;
-  gap:14px;
   justify-content:space-between;
+  gap:10px;
 }
-
 .info-pill{
   pointer-events:none;
   white-space:nowrap;
+  padding: 0.35rem 0.6rem;  /* slightly smaller than main buttons */
+  font-size: 0.85rem;
 }
-

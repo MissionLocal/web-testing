@@ -461,3 +461,16 @@ a:hover { text-decoration: underline; }
   stroke-width: 3px;
   stroke-linejoin: round;
 }
+
+.info-head{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  justify-content:space-between;
+}
+
+.info-pill{
+  pointer-events:none;
+  white-space:nowrap;
+}
+

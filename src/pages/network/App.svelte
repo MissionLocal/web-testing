@@ -161,13 +161,36 @@
     d.y = Math.max(rad, Math.min(height - rad, d.y));
   }
 
-  const nodeHTML = (d) => `
-    <div class="info-label"><strong>${d.label}</strong></div>
-    ${d.label_description ? `<div class="info-description">${d.label_description}</div>` : ""}
-  `;
+  // --- Safe HTML helpers (since we use {@html}) ---
+  function escapeHTML(s) {
+    return String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function primaryGroup(d) {
+    return d.groups?.length ? d.groups[0] : "other";
+  }
+
+  // ✅ Node info now includes group "pill" styled like your buttons
+  const nodeHTML = (d) => {
+    const label = escapeHTML(d.label);
+    const desc = d.label_description ? escapeHTML(d.label_description) : "";
+    const g = escapeHTML(primaryGroup(d));
+    return `
+      <div class="info-head">
+        <div class="info-label"><strong>${label}</strong></div>
+        <span class="button info-pill" aria-hidden="true">${g}</span>
+      </div>
+      ${desc ? `<div class="info-description">${desc}</div>` : ""}
+    `;
+  };
 
   function linkHTML(d) {
-    return d.notes ? `<div class="info-description">${d.notes}</div>` : "";
+    return d.notes ? `<div class="info-description">${escapeHTML(d.notes)}</div>` : "";
   }
 
   function safeId(raw) {
@@ -186,11 +209,36 @@
     return neigh;
   }
 
-  // ✅ label helpers
+  // ✅ LABELS: show/hide + clamp to stay inside SVG bounds
+  const LABEL_PAD = 6; // padding from edges
+  const LABEL_GAP = 8; // gap above node
+
+  function clampLabelToBounds(d, el) {
+    const w = el.getComputedTextLength ? el.getComputedTextLength() : 60;
+
+    const minX = LABEL_PAD + w / 2;
+    const maxX = width - LABEL_PAD - w / 2;
+    const x = Math.max(minX, Math.min(maxX, d.x));
+
+    const yAbove = d.y - (r(d) + LABEL_GAP);
+    const minY = 14; // baseline room at top
+    const y = Math.max(minY, yAbove);
+
+    return { x, y };
+  }
+
   function showOnlyLabel(nodeId) {
     if (!gLabels) return;
     gLabels.selectAll("text").style("opacity", (n) => (n.id === nodeId ? 1 : 0));
   }
+
+  function showLinkEndpointLabels(l) {
+    if (!gLabels) return;
+    const s = linkSourceId(l);
+    const t = linkTargetId(l);
+    gLabels.selectAll("text").style("opacity", (n) => (n.id === s || n.id === t ? 1 : 0));
+  }
+
   function hideAllLabels() {
     if (!gLabels) return;
     gLabels.selectAll("text").style("opacity", 0);
@@ -217,7 +265,6 @@
 
     const s = linkSourceId(l);
     const t = linkTargetId(l);
-
     const endpoints = new Set([s, t]);
 
     gNodes
@@ -226,8 +273,6 @@
       .classed("is-dim", (n) => !endpoints.has(n.id));
 
     gLinks.selectAll("line").classed("is-hi", (lnk) => lnk === l).classed("is-dim", (lnk) => lnk !== l);
-
-    if (!isPinned()) hideAllLabels();
   }
 
   function clearFocus() {
@@ -300,9 +345,7 @@
       if (next.has(g)) next.delete(g);
       else next.add(g);
 
-      if (groupOptions.every((opt) => next.has(opt))) {
-        next = new Set();
-      }
+      if (groupOptions.every((opt) => next.has(opt))) next = new Set();
     }
 
     selectedGroups = next;
@@ -370,7 +413,7 @@
     defs = svg.append("defs");
     gRoot = svg.append("g");
 
-    // ✅ Put hit targets above visible links but below nodes
+    // Order: visible links, then hit targets, then nodes, then labels
     gLinks = gRoot.append("g").attr("class", "links");
     gLinkHits = gRoot.append("g").attr("class", "link-hits");
     gNodes = gRoot.append("g").attr("class", "nodes");
@@ -385,11 +428,11 @@
       .attr("stroke-opacity", 0.6)
       .attr("stroke-width", (d) => 1 + 3 * (d.strength ?? 0.5));
 
-    // ✅ Invisible wide hit targets for links (mobile friendly)
+    // Invisible wide hit targets for links (mobile friendly)
     const isMobileNow = window.matchMedia("(max-width: 640px)").matches;
     const HIT_PX = isMobileNow ? 22 : 14;
 
-    const linkHitSel = gLinkHits
+    gLinkHits
       .selectAll("line")
       .data(links, (d) => (d.source.id ?? d.source) + "->" + (d.target.id ?? d.target))
       .join("line")
@@ -398,12 +441,12 @@
       .style("cursor", "pointer")
       .style("pointer-events", "stroke")
       .on("pointerenter", (event, d) => {
-        // bring visible link to top (within its group)
         linkSel.filter((x) => x === d).raise();
 
         if (!isPinned()) {
           applyLinkFocus(d);
           showInfo(linkHTML(d));
+          showLinkEndpointLabels(d); // ✅ show two endpoint labels
         }
       })
       .on("pointerleave", () => {
@@ -424,6 +467,7 @@
           pinned = { type: "link", key: k };
           showInfo(linkHTML(d));
           applyLinkFocus(d);
+          showLinkEndpointLabels(d); // ✅ keep two labels visible when pinned
         }
 
         event.stopPropagation();
@@ -460,7 +504,7 @@
 
             d3.select(this).attr("fill", `url(#${patId})`);
           } else {
-            d3.select(this).attr("fill", color(d.groups?.[0] ?? "other"));
+            d3.select(this).attr("fill", color(primaryGroup(d)));
           }
         });
 
@@ -504,7 +548,7 @@
       .join("text")
       .attr("class", "node-label")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => -(r(d) + 8))
+      .attr("dy", 0) // ✅ we set y explicitly in tick; don't double-offset with dy
       .text((d) => d.label)
       .style("opacity", 0)
       .style("pointer-events", "none");
@@ -530,10 +574,7 @@
 
     simulation = d3
       .forceSimulation(nodes)
-      .force(
-        "link",
-        d3.forceLink(cleanLinks).id((d) => d.id).strength((d) => d.strength ?? 1).distance(50),
-      )
+      .force("link", d3.forceLink(cleanLinks).id((d) => d.id).strength((d) => d.strength ?? 1).distance(50))
       .force("charge", d3.forceManyBody().strength(-50))
       .force("collide", d3.forceCollide().radius((d) => r(d) + 6))
       .force("center", d3.forceCenter(width / 2, height / 2))
@@ -549,7 +590,7 @@
           .attr("x2", (d) => d.target.x)
           .attr("y2", (d) => d.target.y);
 
-        // ✅ link hit targets match same coords
+        // hit targets
         gLinkHits
           .selectAll("line")
           .attr("x1", (d) => d.source.x)
@@ -560,8 +601,11 @@
         // nodes
         gNodes.selectAll("circle").attr("cx", (d) => d.x).attr("cy", (d) => d.y);
 
-        // labels follow nodes
-        gLabels.selectAll("text").attr("x", (d) => d.x).attr("y", (d) => d.y);
+        // ✅ labels clamped inside chart bounds
+        gLabels.selectAll("text").each(function (d) {
+          const { x, y } = clampLabelToBounds(d, this);
+          d3.select(this).attr("x", x).attr("y", y);
+        });
       });
 
     resize();

@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import * as d3 from "d3";
 
   import graph from "../data/graph.json";
@@ -33,6 +33,13 @@
       if (norm(n.label).includes(qq)) ids.add(n.id);
     }
     return ids;
+  }
+
+  function linkSourceId(l) {
+    return l.source?.id ?? l.source;
+  }
+  function linkTargetId(l) {
+    return l.target?.id ?? l.target;
   }
 
   function clearSearchDimming() {
@@ -69,7 +76,10 @@
 
     gLinks
       .selectAll("line")
-      .classed("is-search-hi", (l) => matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l)))
+      .classed(
+        "is-search-hi",
+        (l) => matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l)),
+      )
       .classed(
         "is-search-dim",
         (l) => !(matchIds.has(linkSourceId(l)) && matchIds.has(linkTargetId(l))),
@@ -77,16 +87,14 @@
   }
 
   function onSearchInput() {
-    // ✅ Do NOT clear focus/pin. Search should just filter/dim.
+    // Search should just dim; do not clear focus/pin.
     mobileFilterOpen = false;
 
     const matches = searchMatches(searchTerm);
     applySearchDimming(matches);
     applyCategoryDimming();
 
-    // If something is pinned, keep its connections visible.
     if (pinned?.type === "node") applyFocus(pinned.id);
-    // if pinned link: focus is already applied when pinned
   }
 
   function clearSearch() {
@@ -125,8 +133,10 @@
   const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
 
   // Svelte refs & state
+  let wrapper; // ✅ observe this for height changes
   let container;
   let infoPanelEl;
+
   let svg, defs, gRoot, gLinks, gNodes;
   let width = 800,
     height = 500;
@@ -169,13 +179,6 @@
     return String(raw).replace(/[^a-zA-Z0-9_-]/g, "_");
   }
 
-  function linkSourceId(l) {
-    return l.source?.id ?? l.source;
-  }
-  function linkTargetId(l) {
-    return l.target?.id ?? l.target;
-  }
-
   function neighborsOf(nodeId) {
     const neigh = new Set([nodeId]);
     for (const l of links) {
@@ -199,8 +202,14 @@
 
     gLinks
       .selectAll("line")
-      .classed("is-hi", (l) => linkSourceId(l) === nodeId || linkTargetId(l) === nodeId)
-      .classed("is-dim", (l) => !(linkSourceId(l) === nodeId || linkTargetId(l) === nodeId));
+      .classed(
+        "is-hi",
+        (l) => linkSourceId(l) === nodeId || linkTargetId(l) === nodeId,
+      )
+      .classed(
+        "is-dim",
+        (l) => !(linkSourceId(l) === nodeId || linkTargetId(l) === nodeId),
+      );
   }
 
   function applyLinkFocus(l) {
@@ -290,7 +299,6 @@
       if (next.has(g)) next.delete(g);
       else next.add(g);
 
-      // If everything is selected, collapse back to "All"
       if (groupOptions.every((opt) => next.has(opt))) {
         next = new Set();
       }
@@ -318,21 +326,19 @@
     } catch {}
   }
 
-  // ✅ Best WP fix: observe real height changes (so byline never clips)
+  // ✅ Observe wrapper size changes and send height (best for WP + byline)
   let ro;
   let heightRaf = 0;
 
   function startHeightObserver() {
-    if (!pymChild || typeof ResizeObserver === "undefined") return;
+    if (!pymChild || typeof ResizeObserver === "undefined" || !wrapper) return;
 
     ro = new ResizeObserver(() => {
       cancelAnimationFrame(heightRaf);
       heightRaf = requestAnimationFrame(() => postHeight());
     });
 
-    // Observe the whole doc
-    ro.observe(document.documentElement);
-    ro.observe(document.body);
+    ro.observe(wrapper);
   }
 
   const PANEL_RESERVE_PX = 10;
@@ -344,7 +350,6 @@
   function showInfo(html) {
     infoHTML = html;
     infoVisible = true;
-    // If panel affects height, nudge pym once
     requestAnimationFrame(postHeight);
   }
 
@@ -521,6 +526,7 @@
       .force("y", d3.forceY(height / 2).strength(0.08))
       .on("tick", () => {
         nodes.forEach(clampNode);
+
         linkSel
           .attr("x1", (d) => d.source.x)
           .attr("y1", (d) => d.source.y)
@@ -535,9 +541,6 @@
 
     applyCategoryDimming();
     applySearchDimming(searchMatches(searchTerm));
-
-    // One more nudge after init
-    requestAnimationFrame(postHeight);
   }
 
   function resize() {
@@ -580,7 +583,7 @@
 
   let _onWinResize, _onLoad;
 
-  onMount(() => {
+  onMount(async () => {
     init();
 
     // ✅ Listen for scrolly commands
@@ -598,11 +601,14 @@
       if (window.pym) pymChild = new window.pym.Child();
     } catch {}
 
-    // ✅ Observe height changes so WP iframe always fits (byline, etc.)
+    // ✅ Wait for Svelte to paint the byline + controls, then send height
+    await tick();
+    requestAnimationFrame(postHeight);
+
+    // ✅ Start observing wrapper for real size changes
     startHeightObserver();
 
-    // Still fine to do a few nudges
-    requestAnimationFrame(postHeight);
+    // ✅ extra nudges after layout settles (fonts/images)
     setTimeout(postHeight, 250);
     setTimeout(postHeight, 1000);
 
@@ -630,7 +636,7 @@
 </script>
 
 <!-- Wrapper -->
-<div class="network-chart">
+<div class="network-chart" bind:this={wrapper}>
   <div class="chart" bind:this={container}>
     <div class="controls" on:pointerdown|stopPropagation>
       <!-- Desktop pills -->
@@ -729,4 +735,37 @@
       <div class="info-content">{@html infoHTML}</div>
     </div>
   </div>
+
+  <!-- ✅ Byline INSIDE the app so pym always measures it -->
+  <div class="byline">By <strong>Kelly Waldron</strong> • Mission Local</div>
 </div>
+
+<style>
+  /* Byline */
+  .byline {
+    margin: 10px auto 18px;
+    font: 500 0.85rem/1.25 var(--font-sans, "Barlow", system-ui, sans-serif);
+    color: var(--muted, #6b7280);
+    text-align: center;
+  }
+
+  /* ✅ Mobile fix: dropdown should cover search bar */
+  @media (max-width: 640px) {
+    :global(.network-chart .controls-select) {
+      position: relative;
+      z-index: 50;
+    }
+    :global(.network-chart .controls-search) {
+      position: relative;
+      z-index: 10; /* below dropdown */
+    }
+    :global(.network-chart .filter-pop) {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      z-index: 60;
+      margin-top: 0; /* override any existing margin */
+    }
+  }
+</style>

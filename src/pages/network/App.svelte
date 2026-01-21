@@ -3,11 +3,9 @@
   import * as d3 from "d3";
 
   import graph from "../data/graph.json";
-
-  // ✅ Scrolly command listener
   import { scrollyCommand } from "../../lib/scrollyController";
 
-  // ---- MASTER DATA (unchanged references) ----
+  // ---- MASTER DATA ----
   const allNodes = graph.nodes;
   const allLinks = graph.links;
 
@@ -17,7 +15,7 @@
 
   const nodeById = new Map(allNodes.map((d) => [d.id, d]));
 
-  // ---- SEARCH UI STATE (case-insensitive label search) ----
+  // ---- SEARCH UI STATE ----
   let searchTerm = "";
   let searchStatus = "";
 
@@ -87,7 +85,6 @@
   }
 
   function onSearchInput() {
-    // Search should just dim; do not clear focus/pin.
     mobileFilterOpen = false;
 
     const matches = searchMatches(searchTerm);
@@ -105,7 +102,7 @@
     if (pinned?.type === "node") applyFocus(pinned.id);
   }
 
-  // ---- FILTER UI STATE (multi-select; empty Set == "All") ----
+  // ---- FILTER UI STATE ----
   let selectedGroups = new Set();
   const isAllSelected = () => selectedGroups.size === 0;
 
@@ -133,17 +130,18 @@
   const idToImg = new Map(allNodes.map((n) => [n.id, findImageUrl(n.id)]));
 
   // Svelte refs & state
-  let wrapper; // ✅ observe this for height changes
+  let wrapper;
   let container;
   let infoPanelEl;
 
-  let svg, defs, gRoot, gLinks, gNodes;
+  let svg, defs, gRoot, gLinks, gNodes, gLabels; // ✅ gLabels is shared
   let width = 800,
     height = 500;
   let simulation;
 
   let linkSel;
   let nodeSel;
+  let labelSel; // ✅ keep selection
 
   // Info panel / pin state
   let pinned = null; // null | { type: "node", id } | { type: "link", key }
@@ -190,6 +188,16 @@
     return neigh;
   }
 
+  // ✅ label helpers
+  function showOnlyLabel(nodeId) {
+    if (!gLabels) return;
+    gLabels.selectAll("text").style("opacity", (n) => (n.id === nodeId ? 1 : 0));
+  }
+  function hideAllLabels() {
+    if (!gLabels) return;
+    gLabels.selectAll("text").style("opacity", 0);
+  }
+
   function applyFocus(nodeId) {
     if (!gNodes || !gLinks) return;
 
@@ -202,14 +210,8 @@
 
     gLinks
       .selectAll("line")
-      .classed(
-        "is-hi",
-        (l) => linkSourceId(l) === nodeId || linkTargetId(l) === nodeId,
-      )
-      .classed(
-        "is-dim",
-        (l) => !(linkSourceId(l) === nodeId || linkTargetId(l) === nodeId),
-      );
+      .classed("is-hi", (l) => linkSourceId(l) === nodeId || linkTargetId(l) === nodeId)
+      .classed("is-dim", (l) => !(linkSourceId(l) === nodeId || linkTargetId(l) === nodeId));
   }
 
   function applyLinkFocus(l) {
@@ -217,6 +219,7 @@
 
     const s = linkSourceId(l);
     const t = linkTargetId(l);
+
     const endpoints = new Set([s, t]);
 
     gNodes
@@ -224,10 +227,10 @@
       .classed("is-hi", (n) => endpoints.has(n.id))
       .classed("is-dim", (n) => !endpoints.has(n.id));
 
-    gLinks
-      .selectAll("line")
-      .classed("is-hi", (lnk) => lnk === l)
-      .classed("is-dim", (lnk) => lnk !== l);
+    gLinks.selectAll("line").classed("is-hi", (lnk) => lnk === l).classed("is-dim", (lnk) => lnk !== l);
+
+    // optional: hide node labels when hovering links
+    if (!isPinned()) hideAllLabels();
   }
 
   function clearFocus() {
@@ -250,6 +253,7 @@
     pinned = null;
     hideInfo(true);
     clearFocus();
+    hideAllLabels(); // ✅
   }
 
   // ---- Category dimming ----
@@ -306,10 +310,10 @@
 
     selectedGroups = next;
 
-    // Clear pin + focus when changing filter
     pinned = null;
     hideInfo(true);
     clearFocus();
+    hideAllLabels();
 
     applySearchDimming(searchMatches(searchTerm));
     applyCategoryDimming();
@@ -317,7 +321,7 @@
     filterRenderKey += 1;
   }
 
-  // ---- Pym (optional/guarded) ----
+  // ---- Pym ----
   let pymChild = null;
 
   function postHeight() {
@@ -326,7 +330,6 @@
     } catch {}
   }
 
-  // ✅ Observe wrapper size changes and send height (best for WP + byline)
   let ro;
   let heightRaf = 0;
 
@@ -371,6 +374,7 @@
     gRoot = svg.append("g");
     gLinks = gRoot.append("g").attr("class", "links");
     gNodes = gRoot.append("g").attr("class", "nodes");
+    gLabels = gRoot.append("g").attr("class", "labels"); // ✅ assign to shared var
 
     // Links
     linkSel = gLinks
@@ -403,6 +407,7 @@
         if (!isPinned()) {
           clearFocus();
           hideInfo(true);
+          hideAllLabels();
         }
       })
       .on("pointerdown", (event, d) => {
@@ -426,11 +431,7 @@
       .selectAll("circle")
       .data(nodes, (d) => d.id)
       .join((enter) => {
-        const circles = enter
-          .append("circle")
-          .attr("r", r)
-          .attr("stroke", "#333")
-          .attr("stroke-width", 1);
+        const circles = enter.append("circle").attr("r", r).attr("stroke", "#333").attr("stroke-width", 1);
 
         circles.each(function (d) {
           const url = idToImg.get(d.id);
@@ -466,12 +467,14 @@
         if (!isPinned()) {
           applyFocus(d.id);
           showInfo(nodeHTML(d));
+          showOnlyLabel(d.id); // ✅ show small label
         }
       })
       .on("pointerleave", () => {
         if (!isPinned()) {
           clearFocus();
           hideInfo(true);
+          hideAllLabels(); // ✅
         }
       })
       .on("pointerdown", (event, d) => {
@@ -485,12 +488,25 @@
           applySearchDimming(searchMatches(searchTerm));
           applyCategoryDimming();
           applyFocus(d.id);
+          showOnlyLabel(d.id); // ✅ pinned label stays
         }
         event.stopPropagation();
       })
       .call(drag());
 
-    // Background click = clear pin (keep search active)
+    // ✅ Labels (hidden by default)
+    labelSel = gLabels
+      .selectAll("text")
+      .data(nodes, (d) => d.id)
+      .join("text")
+      .attr("class", "node-label")
+      .attr("text-anchor", "middle")
+      .attr("dy", (d) => -(r(d) + 8))
+      .text((d) => d.label)
+      .style("opacity", 0)
+      .style("pointer-events", "none");
+
+    // Background click = clear pin
     d3.select(container).on("pointerdown", () => {
       unpin();
       mobileFilterOpen = false;
@@ -513,11 +529,7 @@
       .forceSimulation(nodes)
       .force(
         "link",
-        d3
-          .forceLink(cleanLinks)
-          .id((d) => d.id)
-          .strength((d) => d.strength ?? 1)
-          .distance(20),
+        d3.forceLink(cleanLinks).id((d) => d.id).strength((d) => d.strength ?? 1).distance(50),
       )
       .force("charge", d3.forceManyBody().strength(-50))
       .force("collide", d3.forceCollide().radius((d) => r(d) + 6))
@@ -534,6 +546,9 @@
           .attr("y2", (d) => d.target.y);
 
         gNodes.selectAll("circle").attr("cx", (d) => d.x).attr("cy", (d) => d.y);
+
+        // ✅ keep labels attached to nodes
+        gLabels.selectAll("text").attr("x", (d) => d.x).attr("y", (d) => d.y);
       });
 
     resize();
@@ -586,7 +601,6 @@
   onMount(async () => {
     init();
 
-    // ✅ Listen for scrolly commands
     unsubscribeScrolly = scrollyCommand.subscribe((cmd) => {
       if (!cmd) return;
       if (!container) return;
@@ -601,14 +615,11 @@
       if (window.pym) pymChild = new window.pym.Child();
     } catch {}
 
-    // ✅ Wait for Svelte to paint the byline + controls, then send height
     await tick();
     requestAnimationFrame(postHeight);
 
-    // ✅ Start observing wrapper for real size changes
     startHeightObserver();
 
-    // ✅ extra nudges after layout settles (fonts/images)
     setTimeout(postHeight, 250);
     setTimeout(postHeight, 1000);
 
@@ -736,7 +747,5 @@
     </div>
   </div>
 
-  <!-- ✅ Byline INSIDE the app so pym always measures it -->
-  <div class="byline">Eleni Balakrishnan & Kelly Waldron • Mission Local</div>
+  <div class="byline">Eleni Balakrishnan &amp; Kelly Waldron • Mission Local</div>
 </div>
-
